@@ -1,11 +1,10 @@
-import numpy as np
 import random
 import asyncio
 import pygame
 import sys
 
 # ==========================================
-# 1. 遊戲核心邏輯 (原 Engine)
+# 1. 遊戲核心邏輯 (去 Numpy 化以提高網頁相容性)
 # ==========================================
 EMPTY, BLACK, WHITE = 0, 1, 2
 BOARD_SIZE = 9
@@ -48,7 +47,8 @@ class CardTransformer:
 
 class CardGoState:
     def __init__(self):
-        self.board = np.zeros((BOARD_SIZE, BOARD_SIZE), dtype=np.int8)
+        # 使用 Python 內建清單替代 numpy.zeros
+        self.board = [[EMPTY for _ in range(BOARD_SIZE)] for _ in range(BOARD_SIZE)]
         self.current_player = BLACK
         self.mana = {BLACK: 1, WHITE: 1}
         self.decks, self.discards, self.hand = {BLACK: []}, {BLACK: []}, {BLACK: []}
@@ -56,7 +56,7 @@ class CardGoState:
         self._init_decks()
         self._deal_initial_hands()
         self.ko_snapshot = None
-        self.turn_start_snapshot = self.board.copy()
+        self.turn_start_snapshot = [row[:] for row in self.board]
         self.turn_start_mana = {BLACK: 1, WHITE: 1}
         self.turn_start_hand = {BLACK: [], WHITE: []}
 
@@ -80,112 +80,58 @@ class CardGoState:
 
     def is_legal(self, r, c, color):
         if not (0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE): return False
-        if self.board[r, c] != EMPTY: return False
-        orig = self.board.copy()
-        self.board[r, c] = color
+        if self.board[r][c] != EMPTY: return False
+        orig = [row[:] for row in self.board]
+        self.board[r][c] = color
         self.process_capture(r, c)
-        if self.ko_snapshot is not None and np.array_equal(self.board, self.ko_snapshot):
+        if self.ko_snapshot is not None and self.board == self.ko_snapshot:
             self.board = orig; return False
         has_lib = self.has_liberty(r, c)
         self.board = orig
         return has_lib
 
     def has_liberty(self, r, c):
-        color = self.board[r, c]
+        color = self.board[r][c]
         queue, visited = [(r, c)], {(r, c)}
         while queue:
             cr, cc = queue.pop(0)
             for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:
                 nr, nc = cr + dr, cc + dc
                 if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
-                    if self.board[nr, nc] == EMPTY: return True
-                    if self.board[nr, nc] == color and (nr, nc) not in visited:
+                    if self.board[nr][nc] == EMPTY: return True
+                    if self.board[nr][nc] == color and (nr, nc) not in visited:
                         visited.add((nr, nc)); queue.append((nr, nc))
         return False
 
     def process_capture(self, r, c):
-        opp = WHITE if self.board[r, c] == BLACK else BLACK
+        opp = WHITE if self.board[r][c] == BLACK else BLACK
         for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:
             nr, nc = r + dr, c + dc
-            if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and self.board[nr, nc] == opp:
+            if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and self.board[nr][nc] == opp:
                 if not self.has_liberty(nr, nc):
-                    q, v, color = [(nr, nc)], {(nr, nc)}, self.board[nr, nc]
+                    q, v, color = [(nr, nc)], {(nr, nc)}, self.board[nr][nc]
                     while q:
-                        cr, cc = q.pop(0); self.board[cr, cc] = EMPTY
+                        cr, cc = q.pop(0); self.board[cr][cc] = EMPTY
                         for ddr, ddc in [(0,1),(0,-1),(1,0),(-1,0)]:
                             nnr, nnc = cr + ddr, cc + ddc
-                            if 0 <= nnr < BOARD_SIZE and 0 <= nnc < BOARD_SIZE and self.board[nnr, nnc] == color and (nnr, nnc) not in v:
+                            if 0 <= nnr < BOARD_SIZE and 0 <= nnc < BOARD_SIZE and self.board[nnr][nnc] == color and (nnr, nnc) not in v:
                                 v.add((nnr, nnc)); q.append((nnr, nnc))
 
     def start_turn(self):
-        self.turn_start_snapshot = self.board.copy()
+        self.turn_start_snapshot = [row[:] for row in self.board]
         self.turn_start_mana = self.mana.copy()
         self.turn_start_hand[BLACK], self.turn_start_hand[WHITE] = self.hand[BLACK][:], self.hand[WHITE][:]
 
-    def rollback(self):
-        self.board, self.mana = self.turn_start_snapshot.copy(), self.turn_start_mana.copy()
-        self.hand[BLACK], self.hand[WHITE] = self.turn_start_hand[BLACK][:], self.turn_start_hand[WHITE][:]
-
-    def execute_move(self, action_type='card', used_card=None):
-        self.ko_snapshot = self.turn_start_snapshot.copy()
-        if action_type == 'card' and used_card in self.hand[self.current_player]:
-            self.hand[self.current_player].remove(used_card)
-            self.discards[self.current_player].append(used_card)
-        elif action_type == 'single':
+    def execute_move(self, action_type='single'):
+        self.ko_snapshot = [row[:] for row in self.turn_start_snapshot]
+        if action_type == 'single':
             self.mana[self.current_player] = min(3, self.mana[self.current_player] + 1)
             self.draw_card(self.current_player)
 
     def switch_player(self): self.current_player = WHITE if self.current_player == BLACK else BLACK
 
-    def trade_resources(self, discard_indices, target_resource):
-        if len(discard_indices) != 2: return False
-        for idx in sorted(discard_indices, reverse=True):
-            card = self.hand[self.current_player].pop(idx)
-            self.discards[self.current_player].append(card)
-        if target_resource == 'mana': self.mana[self.current_player] = min(3, self.mana[self.current_player] + 1)
-        else: self.draw_card(self.current_player)
-        return True
-
-    def remove_dead_group(self, r, c):
-        color = self.board[r, c]
-        if color == EMPTY: return
-        q, group = [(r, c)], {(r, c)}
-        while q:
-            cr, cc = q.pop(0)
-            for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:
-                nr, nc = cr + dr, cc + dc
-                if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and self.board[nr, nc] == color and (nr, nc) not in group:
-                    group.add((nr, nc)); q.append((nr, nc))
-        for gr, gc in group: self.board[gr, gc] = EMPTY
-
-    def calculate_score(self):
-        b_s, w_s, visited = 0.0, 0.0, set()
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                if self.board[r, c] == BLACK: b_s += 1.0
-                elif self.board[r, c] == WHITE: w_s += 1.0
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                if self.board[r, c] == EMPTY and (r, c) not in visited:
-                    region, borders, q = [], set(), [(r, c)]
-                    visited.add((r, c))
-                    while q:
-                        cr, cc = q.pop(0); region.append((cr, cc))
-                        for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:
-                            nr, nc = cr + dr, cc + dc
-                            if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
-                                if self.board[nr, nc] == EMPTY and (nr, nc) not in visited:
-                                    visited.add((nr, nc)); q.append((nr, nc))
-                                elif self.board[nr, nc] != EMPTY: borders.add(self.board[nr, nc])
-                    if borders == {BLACK}: b_s += len(region)
-                    elif borders == {WHITE}: w_s += len(region)
-                    else: b_s += len(region)*0.5; w_s += len(region)*0.5
-        w_s += KOMI
-        win = f"黑方勝 (+{b_s - w_s:.1f})" if b_s > w_s else f"白方勝 (+{w_s - b_s:.1f})"
-        return b_s, w_s, win
-
 # ==========================================
-# 2. UI 設計 (原 UI)
+# 2. UI 設計
 # ==========================================
 CELL_SIZE, MARGIN = 60, 40
 VIRTUAL_WIDTH = CELL_SIZE * (BOARD_SIZE - 1) + MARGIN * 2
@@ -203,10 +149,11 @@ class GoUI:
         self.virtual_surface = pygame.Surface((VIRTUAL_WIDTH, VIRTUAL_HEIGHT))
         self.game = game_state
         self.tf = CardTransformer()
-        self.card_font = pygame.font.SysFont("Arial", 16, bold=True)
-        self.title_font = pygame.font.SysFont("Arial", 20, bold=True)
-        self.mana_font = pygame.font.SysFont("Arial", 20, bold=True)
-        self.scale_factor, self.offset_x, self.offset_y = 1.0, 0, 0
+        # 修正：字型改用預設，增加相容性
+        self.card_font = pygame.font.Font(None, 24)
+        self.title_font = pygame.font.Font(None, 28)
+        self.mana_font = pygame.font.Font(None, 28)
+        self.scale_factor = 1.0
 
     def draw_all(self, screen, selected_id, possible_variants, step_idx, origin, mode, discard_selection, has_acted):
         self.virtual_surface.fill(BACKGROUND_COLOR)
@@ -215,23 +162,20 @@ class GoUI:
             pygame.draw.line(self.virtual_surface, GRID_COLOR, (MARGIN + i * CELL_SIZE, MARGIN), (MARGIN + i * CELL_SIZE, VIRTUAL_WIDTH - MARGIN))
         for r in range(BOARD_SIZE):
             for c in range(BOARD_SIZE):
-                if self.game.board[r, c] != EMPTY:
-                    color = BLACK_STONE if self.game.board[r, c] == BLACK else WHITE_STONE
+                if self.game.board[r][c] != EMPTY:
+                    color = BLACK_STONE if self.game.board[r][c] == BLACK else WHITE_STONE
                     pygame.draw.circle(self.virtual_surface, color, (MARGIN + c * CELL_SIZE, MARGIN + r * CELL_SIZE), 25)
 
-        # UI Panel
         panel_y = VIRTUAL_WIDTH
         pygame.draw.rect(self.virtual_surface, (50, 50, 55), (0, panel_y, VIRTUAL_WIDTH, PANEL_HEIGHT))
         curr_p = self.game.current_player
-        status = f"{'Black' if curr_p==BLACK else 'White'} | Mana:{self.game.mana[curr_p]} | Cards:{len(self.game.decks[curr_p])}"
+        status = f"{'Black' if curr_p==BLACK else 'White'} | Mana:{self.game.mana[curr_p]} | Cards:{len(self.game.hand[curr_p])}"
         self.virtual_surface.blit(self.card_font.render(status, True, (255, 255, 255)), (20, panel_y + 10))
 
-        # 手牌
         hand_y = panel_y + 80
         for i, card_id in enumerate(self.game.hand[curr_p]):
             self.draw_card_visual(20 + i * 110, hand_y, card_id, (selected_id == card_id), (i in discard_selection))
 
-        # 縮放與繪製到主螢幕
         sw, sh = screen.get_size()
         self.scale_factor = min(sw / VIRTUAL_WIDTH, sh / VIRTUAL_HEIGHT)
         scaled = pygame.transform.scale(self.virtual_surface, (int(VIRTUAL_WIDTH * self.scale_factor), int(VIRTUAL_HEIGHT * self.scale_factor)))
@@ -243,8 +187,8 @@ class GoUI:
         color = SELECTED_COLOR if is_selected else (DISCARD_SEL_COLOR if is_discard_sel else CARD_BORDER_COLOR)
         pygame.draw.rect(self.virtual_surface, CARD_BG_COLOR, rect, border_radius=8)
         pygame.draw.rect(self.virtual_surface, color, rect, width=3, border_radius=8)
-        self.virtual_surface.blit(self.title_font.render(name_cn, True, (0,0,0)), (x+10, y+10))
-        self.virtual_surface.blit(self.mana_font.render(str(cost), True, MANA_COLOR), (x+10, y+CARD_H-30))
+        # 注意：預設字型可能無法顯示中文，若需顯示中文建議之後上傳 .ttf 字型檔
+        self.virtual_surface.blit(self.card_font.render(card_id[:6], True, (0,0,0)), (x+10, y+10))
 
     def get_board_pos(self, m_pos, sw, sh):
         sf = min(sw / VIRTUAL_WIDTH, sh / VIRTUAL_HEIGHT)
@@ -255,13 +199,12 @@ class GoUI:
         return (r, c) if 0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE else None
 
 # ==========================================
-# 3. 非同步主程式 (Controller)
+# 3. 主程式
 # ==========================================
 async def main():
     pygame.init()
     screen = pygame.display.set_mode((VIRTUAL_WIDTH, VIRTUAL_HEIGHT), pygame.RESIZABLE)
     game = CardGoState()
-    tf = CardTransformer()
     ui = GoUI(game)
     
     sel_id, current_mode, possible_variants, step_idx, origin_pos = None, "single", [], 0, None
@@ -281,17 +224,16 @@ async def main():
                     r, c = b_pos
                     if game.is_legal(r, c, game.current_player):
                         game.start_turn()
-                        game.board[r, c] = game.current_player
+                        game.board[r][c] = game.current_player
                         game.process_capture(r, c)
                         game.execute_move(action_type='single')
                         has_acted = True
                 
-                # 簡易結束回合點擊 (右下角區域測試)
                 if event.pos[1] > sh * 0.8: 
                     game.switch_player()
                     has_acted = False
 
-        await asyncio.sleep(0) # 關鍵：交還控制權給瀏覽器
+        await asyncio.sleep(0)
         clock.tick(60)
 
 if __name__ == "__main__":
