@@ -30,6 +30,48 @@
         fb_width : "1280",
         fb_height : "720"
     }
+    <script type="application/javascript">
+// 定義要檢查的檔案清單
+const filesToCheck = [
+    'main.py',       // 檢查是否更名成功
+    'index.html',    // 基礎頁面
+    'favicon.png',   // 圖示
+    'game.tar.gz'    // 你的壓縮包 (如果 config 裡有設定)
+];
+
+async function checkResources() {
+    const statusDiv = document.getElementById('status');
+    statusDiv.innerHTML = "正在檢查伺服器檔案...<br>";
+    
+    for (let file of filesToCheck) {
+        try {
+            const response = await fetch(file, { method: 'HEAD' });
+            if (response.ok) {
+                statusDiv.innerHTML += `✅ ${file} - 找到檔案<br>`;
+            } else {
+                statusDiv.innerHTML += `❌ ${file} - <span style="color:red">找不到 (404)</span><br>`;
+            }
+        } catch (e) {
+            statusDiv.innerHTML += `⚠️ ${file} - 請求失敗<br>`;
+        }
+    }
+    
+    // 檢查 BrowserFS 是否載入成功
+    setTimeout(() => {
+        if (typeof BrowserFS !== 'undefined') {
+            statusDiv.innerHTML += `✅ BrowserFS - 載入成功<br>`;
+        } else {
+            statusDiv.innerHTML += `❌ BrowserFS - <span style="color:red">載入失敗！</span><br>`;
+        }
+    }, 2000); // 稍微延遲給腳本下載時間
+}
+
+// 在網頁載入後執行
+window.addEventListener('load', checkResources);
+</script>
+
+
+        
     </script>
 
     <style>
@@ -101,3 +143,4 @@
     </script>
 </body>
 </html>
+
