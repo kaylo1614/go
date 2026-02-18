@@ -1,4 +1,4 @@
-# ⚫⚪ 烏鷺爭霸 (CrowHeronGo)
+# ⚫⚪ 仿烏鷺爭霸小遊戲 (CrowHeronGo)
 
 > **結合傳統圍棋哲學與現代卡牌策略的創新對弈遊戲。**
 > *A strategic fusion of traditional Go (Weiqi) and deck-building mechanics.*
