@@ -2,28 +2,15 @@ import numpy as np
 import random
 import asyncio
 import pygame
+import sys
 
 # ==========================================
-# 1. 遊戲常數 (Constants)
+# 1. 遊戲核心邏輯 (原 Engine)
 # ==========================================
 EMPTY, BLACK, WHITE = 0, 1, 2
 BOARD_SIZE = 9
 KOMI = 7.5
-CELL_SIZE = 50
-MARGIN = 40
-BOARD_WIDTH = (BOARD_SIZE - 1) * CELL_SIZE + 2 * MARGIN
-WINDOW_WIDTH = BOARD_WIDTH + 250  # 右側留給手牌與資訊
-WINDOW_HEIGHT = BOARD_WIDTH + 100
 
-# 顏色定義
-COLOR_BOARD = (220, 179, 92)
-COLOR_BLACK = (30, 30, 30)
-COLOR_WHITE = (240, 240, 240)
-COLOR_TEXT = (50, 50, 50)
-
-# ==========================================
-# 2. 邏輯類別 (你原本的邏輯)
-# ==========================================
 class CardTransformer:
     def __init__(self):
         self.db = {
@@ -48,114 +35,264 @@ class CardTransformer:
     def rotate_90(self, coords): return [(c, -r) for r, c in coords]
     def flip_horizontal(self, coords): return [(r, -c) for r, c in coords]
 
+    def get_all_variants(self, card_name):
+        if card_name not in self.db: return []
+        _, _, base_coords, _, can_flip = self.db[card_name]
+        final_variants = []
+        curr_seq = base_coords
+        for _ in range(4):
+            curr_seq = self.rotate_90(curr_seq)
+            final_variants.append(curr_seq)
+            if can_flip: final_variants.append(self.flip_horizontal(curr_seq))
+        return final_variants
+
 class CardGoState:
     def __init__(self):
         self.board = np.zeros((BOARD_SIZE, BOARD_SIZE), dtype=np.int8)
         self.current_player = BLACK
         self.mana = {BLACK: 1, WHITE: 1}
-        self.decks = {BLACK: [], WHITE: []}
-        self.discards = {BLACK: [], WHITE: []}
-        self.hand = {BLACK: [], WHITE: []}
+        self.decks, self.discards, self.hand = {BLACK: []}, {BLACK: []}, {BLACK: []}
+        self.decks[WHITE], self.discards[WHITE], self.hand[WHITE] = [], [], []
         self._init_decks()
         self._deal_initial_hands()
         self.ko_snapshot = None
+        self.turn_start_snapshot = self.board.copy()
+        self.turn_start_mana = {BLACK: 1, WHITE: 1}
+        self.turn_start_hand = {BLACK: [], WHITE: []}
 
     def _init_decks(self):
-        basics = ["Stretch"]*3 + ["Diagonal"]*3 + ["One-space Jump"]*3 + \
-                 ["Two-space Jump"]*2 + ["Knight's Move"]*3 + ["Large Knight's Move"]*2 + \
-                 ["Elephant's Move"]*2 + ["Double Diagonal"]*1
+        basics = ["Stretch"]*3 + ["Diagonal"]*3 + ["One-space Jump"]*3 + ["Two-space Jump"]*2 + ["Knight's Move"]*3 + ["Large Knight's Move"]*2 + ["Elephant's Move"]*2 + ["Double Diagonal"]*1
         advanced = ["Tiger's Mouth"]*1 + ["Ponnuki"]*1 + ["Bent Three"]*1 + ["Straight Three"]*1
         self.decks[BLACK] = basics + advanced + ["Dark Strike"]*1 + ["Sun Trample"]*2
         self.decks[WHITE] = basics + advanced + ["Bright Flash"]*1 + ["Moon Shard"]*2
-        random.shuffle(self.decks[BLACK])
-        random.shuffle(self.decks[WHITE])
+        random.shuffle(self.decks[BLACK]); random.shuffle(self.decks[WHITE])
 
     def _deal_initial_hands(self):
-        for _ in range(3):
-            self.draw_card(BLACK)
-            self.draw_card(WHITE)
+        for _ in range(3): self.draw_card(BLACK); self.draw_card(WHITE)
 
     def draw_card(self, color):
         if len(self.hand[color]) >= 5: return
         if not self.decks[color]:
             if not self.discards[color]: return
-            self.decks[color] = self.discards[color][:]
-            self.discards[color] = []
+            self.decks[color] = self.discards[color][:]; self.discards[color] = []
             random.shuffle(self.decks[color])
         self.hand[color].append(self.decks[color].pop())
 
+    def is_legal(self, r, c, color):
+        if not (0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE): return False
+        if self.board[r, c] != EMPTY: return False
+        orig = self.board.copy()
+        self.board[r, c] = color
+        self.process_capture(r, c)
+        if self.ko_snapshot is not None and np.array_equal(self.board, self.ko_snapshot):
+            self.board = orig; return False
+        has_lib = self.has_liberty(r, c)
+        self.board = orig
+        return has_lib
+
+    def has_liberty(self, r, c):
+        color = self.board[r, c]
+        queue, visited = [(r, c)], {(r, c)}
+        while queue:
+            cr, cc = queue.pop(0)
+            for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:
+                nr, nc = cr + dr, cc + dc
+                if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
+                    if self.board[nr, nc] == EMPTY: return True
+                    if self.board[nr, nc] == color and (nr, nc) not in visited:
+                        visited.add((nr, nc)); queue.append((nr, nc))
+        return False
+
+    def process_capture(self, r, c):
+        opp = WHITE if self.board[r, c] == BLACK else BLACK
+        for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:
+            nr, nc = r + dr, c + dc
+            if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and self.board[nr, nc] == opp:
+                if not self.has_liberty(nr, nc):
+                    q, v, color = [(nr, nc)], {(nr, nc)}, self.board[nr, nc]
+                    while q:
+                        cr, cc = q.pop(0); self.board[cr, cc] = EMPTY
+                        for ddr, ddc in [(0,1),(0,-1),(1,0),(-1,0)]:
+                            nnr, nnc = cr + ddr, cc + ddc
+                            if 0 <= nnr < BOARD_SIZE and 0 <= nnc < BOARD_SIZE and self.board[nnr, nnc] == color and (nnr, nnc) not in v:
+                                v.add((nnr, nnc)); q.append((nnr, nnc))
+
+    def start_turn(self):
+        self.turn_start_snapshot = self.board.copy()
+        self.turn_start_mana = self.mana.copy()
+        self.turn_start_hand[BLACK], self.turn_start_hand[WHITE] = self.hand[BLACK][:], self.hand[WHITE][:]
+
+    def rollback(self):
+        self.board, self.mana = self.turn_start_snapshot.copy(), self.turn_start_mana.copy()
+        self.hand[BLACK], self.hand[WHITE] = self.turn_start_hand[BLACK][:], self.turn_start_hand[WHITE][:]
+
+    def execute_move(self, action_type='card', used_card=None):
+        self.ko_snapshot = self.turn_start_snapshot.copy()
+        if action_type == 'card' and used_card in self.hand[self.current_player]:
+            self.hand[self.current_player].remove(used_card)
+            self.discards[self.current_player].append(used_card)
+        elif action_type == 'single':
+            self.mana[self.current_player] = min(3, self.mana[self.current_player] + 1)
+            self.draw_card(self.current_player)
+
+    def switch_player(self): self.current_player = WHITE if self.current_player == BLACK else BLACK
+
+    def trade_resources(self, discard_indices, target_resource):
+        if len(discard_indices) != 2: return False
+        for idx in sorted(discard_indices, reverse=True):
+            card = self.hand[self.current_player].pop(idx)
+            self.discards[self.current_player].append(card)
+        if target_resource == 'mana': self.mana[self.current_player] = min(3, self.mana[self.current_player] + 1)
+        else: self.draw_card(self.current_player)
+        return True
+
+    def remove_dead_group(self, r, c):
+        color = self.board[r, c]
+        if color == EMPTY: return
+        q, group = [(r, c)], {(r, c)}
+        while q:
+            cr, cc = q.pop(0)
+            for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:
+                nr, nc = cr + dr, cc + dc
+                if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE and self.board[nr, nc] == color and (nr, nc) not in group:
+                    group.add((nr, nc)); q.append((nr, nc))
+        for gr, gc in group: self.board[gr, gc] = EMPTY
+
+    def calculate_score(self):
+        b_s, w_s, visited = 0.0, 0.0, set()
+        for r in range(BOARD_SIZE):
+            for c in range(BOARD_SIZE):
+                if self.board[r, c] == BLACK: b_s += 1.0
+                elif self.board[r, c] == WHITE: w_s += 1.0
+        for r in range(BOARD_SIZE):
+            for c in range(BOARD_SIZE):
+                if self.board[r, c] == EMPTY and (r, c) not in visited:
+                    region, borders, q = [], set(), [(r, c)]
+                    visited.add((r, c))
+                    while q:
+                        cr, cc = q.pop(0); region.append((cr, cc))
+                        for dr, dc in [(0,1),(0,-1),(1,0),(-1,0)]:
+                            nr, nc = cr + dr, cc + dc
+                            if 0 <= nr < BOARD_SIZE and 0 <= nc < BOARD_SIZE:
+                                if self.board[nr, nc] == EMPTY and (nr, nc) not in visited:
+                                    visited.add((nr, nc)); q.append((nr, nc))
+                                elif self.board[nr, nc] != EMPTY: borders.add(self.board[nr, nc])
+                    if borders == {BLACK}: b_s += len(region)
+                    elif borders == {WHITE}: w_s += len(region)
+                    else: b_s += len(region)*0.5; w_s += len(region)*0.5
+        w_s += KOMI
+        win = f"黑方勝 (+{b_s - w_s:.1f})" if b_s > w_s else f"白方勝 (+{w_s - b_s:.1f})"
+        return b_s, w_s, win
+
 # ==========================================
-# 3. 繪圖與非同步主程式 (Added for Web)
+# 2. UI 設計 (原 UI)
+# ==========================================
+CELL_SIZE, MARGIN = 60, 40
+VIRTUAL_WIDTH = CELL_SIZE * (BOARD_SIZE - 1) + MARGIN * 2
+PANEL_HEIGHT = 220
+VIRTUAL_HEIGHT = VIRTUAL_WIDTH + PANEL_HEIGHT
+BACKGROUND_COLOR, GRID_COLOR = (220, 179, 92), (0, 0, 0)
+BLACK_STONE, WHITE_STONE = (10, 10, 10), (245, 245, 245)
+CARD_W, CARD_H = 100, 130
+CARD_BG_COLOR, CARD_BORDER_COLOR = (245, 235, 210), (60, 40, 20)
+SELECTED_COLOR, DISCARD_SEL_COLOR = (255, 215, 0), (255, 80, 80)
+MANA_COLOR = (65, 105, 225)
+
+class GoUI:
+    def __init__(self, game_state):
+        self.virtual_surface = pygame.Surface((VIRTUAL_WIDTH, VIRTUAL_HEIGHT))
+        self.game = game_state
+        self.tf = CardTransformer()
+        self.card_font = pygame.font.SysFont("Arial", 16, bold=True)
+        self.title_font = pygame.font.SysFont("Arial", 20, bold=True)
+        self.mana_font = pygame.font.SysFont("Arial", 20, bold=True)
+        self.scale_factor, self.offset_x, self.offset_y = 1.0, 0, 0
+
+    def draw_all(self, screen, selected_id, possible_variants, step_idx, origin, mode, discard_selection, has_acted):
+        self.virtual_surface.fill(BACKGROUND_COLOR)
+        for i in range(BOARD_SIZE):
+            pygame.draw.line(self.virtual_surface, GRID_COLOR, (MARGIN, MARGIN + i * CELL_SIZE), (VIRTUAL_WIDTH - MARGIN, MARGIN + i * CELL_SIZE))
+            pygame.draw.line(self.virtual_surface, GRID_COLOR, (MARGIN + i * CELL_SIZE, MARGIN), (MARGIN + i * CELL_SIZE, VIRTUAL_WIDTH - MARGIN))
+        for r in range(BOARD_SIZE):
+            for c in range(BOARD_SIZE):
+                if self.game.board[r, c] != EMPTY:
+                    color = BLACK_STONE if self.game.board[r, c] == BLACK else WHITE_STONE
+                    pygame.draw.circle(self.virtual_surface, color, (MARGIN + c * CELL_SIZE, MARGIN + r * CELL_SIZE), 25)
+
+        # UI Panel
+        panel_y = VIRTUAL_WIDTH
+        pygame.draw.rect(self.virtual_surface, (50, 50, 55), (0, panel_y, VIRTUAL_WIDTH, PANEL_HEIGHT))
+        curr_p = self.game.current_player
+        status = f"{'Black' if curr_p==BLACK else 'White'} | Mana:{self.game.mana[curr_p]} | Cards:{len(self.game.decks[curr_p])}"
+        self.virtual_surface.blit(self.card_font.render(status, True, (255, 255, 255)), (20, panel_y + 10))
+
+        # 手牌
+        hand_y = panel_y + 80
+        for i, card_id in enumerate(self.game.hand[curr_p]):
+            self.draw_card_visual(20 + i * 110, hand_y, card_id, (selected_id == card_id), (i in discard_selection))
+
+        # 縮放與繪製到主螢幕
+        sw, sh = screen.get_size()
+        self.scale_factor = min(sw / VIRTUAL_WIDTH, sh / VIRTUAL_HEIGHT)
+        scaled = pygame.transform.scale(self.virtual_surface, (int(VIRTUAL_WIDTH * self.scale_factor), int(VIRTUAL_HEIGHT * self.scale_factor)))
+        screen.blit(scaled, ((sw - scaled.get_width()) // 2, (sh - scaled.get_height()) // 2))
+
+    def draw_card_visual(self, x, y, card_id, is_selected, is_discard_sel):
+        name_cn, cost, shape, _, _ = self.tf.db[card_id]
+        rect = pygame.Rect(x, y, CARD_W, CARD_H)
+        color = SELECTED_COLOR if is_selected else (DISCARD_SEL_COLOR if is_discard_sel else CARD_BORDER_COLOR)
+        pygame.draw.rect(self.virtual_surface, CARD_BG_COLOR, rect, border_radius=8)
+        pygame.draw.rect(self.virtual_surface, color, rect, width=3, border_radius=8)
+        self.virtual_surface.blit(self.title_font.render(name_cn, True, (0,0,0)), (x+10, y+10))
+        self.virtual_surface.blit(self.mana_font.render(str(cost), True, MANA_COLOR), (x+10, y+CARD_H-30))
+
+    def get_board_pos(self, m_pos, sw, sh):
+        sf = min(sw / VIRTUAL_WIDTH, sh / VIRTUAL_HEIGHT)
+        vx = (m_pos[0] - (sw - VIRTUAL_WIDTH * sf) // 2) / sf
+        vy = (m_pos[1] - (sh - VIRTUAL_HEIGHT * sf) // 2) / sf
+        c = round((vx - MARGIN) / CELL_SIZE)
+        r = round((vy - MARGIN) / CELL_SIZE)
+        return (r, c) if 0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE else None
+
+# ==========================================
+# 3. 非同步主程式 (Controller)
 # ==========================================
 async def main():
     pygame.init()
-    screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-    pygame.display.set_caption("圍棋卡牌 - Card Go")
-    font = pygame.font.SysFont("Arial", 20)
-    
+    screen = pygame.display.set_mode((VIRTUAL_WIDTH, VIRTUAL_HEIGHT), pygame.RESIZABLE)
     game = CardGoState()
-    running = True
+    tf = CardTransformer()
+    ui = GoUI(game)
+    
+    sel_id, current_mode, possible_variants, step_idx, origin_pos = None, "single", [], 0, None
+    discard_selection, has_acted = set(), False
     clock = pygame.time.Clock()
 
-    while running:
-        # A. 事件處理 (解決 MEDIA USER ACTION REQUIRED)
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                # 簡單落子測試
-                mx, my = pygame.mouse.get_pos()
-                r = round((my - MARGIN) / CELL_SIZE)
-                c = round((mx - MARGIN) / CELL_SIZE)
-                if 0 <= r < BOARD_SIZE and 0 <= c < BOARD_SIZE:
-                    if game.board[r, c] == EMPTY:
-                        game.board[r, c] = game.current_player
-                        game.current_player = WHITE if game.current_player == BLACK else BLACK
-
-        # B. 繪圖邏輯
-        screen.fill((245, 245, 245))
-        
-        # 畫棋盤背景
-        pygame.draw.rect(screen, COLOR_BOARD, (MARGIN-20, MARGIN-20, (BOARD_SIZE-1)*CELL_SIZE+40, (BOARD_SIZE-1)*CELL_SIZE+40))
-        
-        # 畫網格
-        for i in range(BOARD_SIZE):
-            pygame.draw.line(screen, (0,0,0), (MARGIN, MARGIN + i*CELL_SIZE), (MARGIN + (BOARD_SIZE-1)*CELL_SIZE, MARGIN + i*CELL_SIZE))
-            pygame.draw.line(screen, (0,0,0), (MARGIN + i*CELL_SIZE, MARGIN), (MARGIN + i*CELL_SIZE, MARGIN + (BOARD_SIZE-1)*CELL_SIZE))
-
-        # 畫棋子
-        for r in range(BOARD_SIZE):
-            for c in range(BOARD_SIZE):
-                if game.board[r, c] == BLACK:
-                    pygame.draw.circle(screen, COLOR_BLACK, (MARGIN + c*CELL_SIZE, MARGIN + r*CELL_SIZE), 18)
-                elif game.board[r, c] == WHITE:
-                    pygame.draw.circle(screen, COLOR_WHITE, (MARGIN + c*CELL_SIZE, MARGIN + r*CELL_SIZE), 18)
-                    pygame.draw.circle(screen, (0,0,0), (MARGIN + c*CELL_SIZE, MARGIN + r*CELL_SIZE), 18, 1)
-
-        # 顯示遊戲資訊 (側邊欄)
-        info_x = BOARD_WIDTH + 20
-        turn_text = font.render(f"Turn: {'BLACK' if game.current_player == BLACK else 'WHITE'}", True, COLOR_TEXT)
-        screen.blit(turn_text, (info_x, 50))
-        
-        mana_text = font.render(f"Mana: {game.mana[game.current_player]}", True, COLOR_TEXT)
-        screen.blit(mana_text, (info_x, 80))
-
-        # 顯示手牌名稱
-        hand_title = font.render("Hand Cards:", True, COLOR_TEXT)
-        screen.blit(hand_title, (info_x, 150))
-        for i, card in enumerate(game.hand[game.current_player]):
-            card_text = font.render(f"{i+1}. {card}", True, (0, 100, 200))
-            screen.blit(card_text, (info_x, 180 + i*30))
-
-        # C. 關鍵更新
+    while True:
+        ui.draw_all(screen, sel_id, possible_variants, step_idx, origin_pos, current_mode, discard_selection, has_acted)
         pygame.display.flip()
         
-        # 解決 DISCARD : focus 問題的關鍵行
-        await asyncio.sleep(0) 
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT: return
+            if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+                sw, sh = screen.get_size()
+                b_pos = ui.get_board_pos(event.pos, sw, sh)
+                if b_pos and not has_acted:
+                    r, c = b_pos
+                    if game.is_legal(r, c, game.current_player):
+                        game.start_turn()
+                        game.board[r, c] = game.current_player
+                        game.process_capture(r, c)
+                        game.execute_move(action_type='single')
+                        has_acted = True
+                
+                # 簡易結束回合點擊 (右下角區域測試)
+                if event.pos[1] > sh * 0.8: 
+                    game.switch_player()
+                    has_acted = False
+
+        await asyncio.sleep(0) # 關鍵：交還控制權給瀏覽器
         clock.tick(60)
 
-    pygame.quit()
-
-# 啟動遊戲
 if __name__ == "__main__":
     asyncio.run(main())
