@@ -11,7 +11,7 @@ config = {
     gui_divider : 2,
     ume_block : 1,
     can_close : 0,
-    archive : "訓練1", 
+    archive : "game", // ⭐️ 已同步修正
     gui_debug : 0,
     cdn : "https://pygame-web.github.io/cdn/0.9.3/",
     autorun : 1, 
@@ -37,29 +37,17 @@ function show_infobox() {
 
     <style>
         body {
-            font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
+            font-family: "Microsoft JhengHei", sans-serif;
             margin: 0; padding: 0;
             background: linear-gradient(135deg, #1a1a1b 0%, #2d2d30 100%);
-            color: white;
-            overflow: hidden;
+            color: white; overflow: hidden;
         }
-        #status {
-            display: block; margin-top: 20px;
-            font-weight: bold; color: #dcc75c;
-            text-shadow: 1px 1px 2px black;
-        }
-        #progress {
-            height: 12px; width: 80%; max-width: 400px;
-            border-radius: 6px; appearance: none;
-        }
+        #status { display: block; margin-top: 20px; font-weight: bold; color: #dcc75c; }
+        #progress { height: 12px; width: 80%; max-width: 400px; border-radius: 6px; appearance: none; }
         #progress::-webkit-progress-bar { background-color: #444; border-radius: 6px; }
-        #progress::-webkit-progress-value {
-            background-color: #4169E1; border-radius: 6px;
-            box-shadow: 0 0 10px #4169E1;
-        }
+        #progress::-webkit-progress-value { background-color: #4169E1; border-radius: 6px; box-shadow: 0 0 10px #4169E1; }
         #infobox {
-            position: fixed;
-            background: rgba(40, 44, 52, 0.9);
+            position: fixed; background: rgba(40, 44, 52, 0.9);
             color: #fff; border: 2px solid #dcc75c; border-radius: 10px;
             font-size: 20px; padding: 20px 40px; z-index: 9999;
             box-shadow: 0 0 20px rgba(0,0,0,0.5); text-align: center;
@@ -87,11 +75,8 @@ function show_infobox() {
             <progress value="0" max="100" id="progress"></progress>
         </div>
     </div>
-
     <canvas class="emscripten" id="canvas" width="1px" height="1px" oncontextmenu="event.preventDefault()" tabindex=1></canvas>
-    
     <div id="infobox">載入中，請稍候...</div>
-
     <script type="application/javascript">
     async function custom_onload(debug_hidden) {
         if (typeof pyconsole !== 'undefined') pyconsole.hidden = true;
