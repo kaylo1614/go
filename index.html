@@ -25,6 +25,7 @@
         fb_width : "1280",
         fb_height : "720"
     }
+
     function show_infobox() {
         infobox.style.display = "block";
         const w = infobox.offsetWidth;
@@ -48,11 +49,11 @@
             background-color: #4169E1; border-radius: 6px;
             box-shadow: 0 0 10px #4169E1;
         }
-        /* ⭐️ 修正 2：新增啟動按鈕，解決 "MEDIA USER ACTION REQUIRED" */
+        /* ⭐️ 啟動按鈕：解決 MEDIA 錯誤 */
         #start_btn {
             display: none; padding: 12px 30px; font-size: 20px; cursor: pointer;
             background: #4169E1; color: white; border: none;
-            border-radius: 10px; margin-bottom: 20px; font-weight: bold;
+            border-radius: 5px; margin-bottom: 20px; font-weight: bold;
             box-shadow: 0 0 15px rgba(65, 105, 225, 0.5);
         }
         #infobox {
@@ -90,6 +91,7 @@
     </div>
 
     <canvas class="emscripten" id="canvas" width="1px" height="1px" oncontextmenu="event.preventDefault()" tabindex=1></canvas>
+    
     <div id="infobox">載入中，請稍候...</div>
 
     <script type="application/javascript">
