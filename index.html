@@ -49,12 +49,12 @@
         #infobox {
             position: fixed; background: rgba(40, 44, 52, 0.9);
             color: #fff; border: 2px solid #dcc75c; border-radius: 10px;
-            font-size: 20px; padding: 20px 40px; z-index: 9999;
+            font-size: 18px; padding: 20px 40px; z-index: 9999;
             box-shadow: 0 0 20px rgba(0,0,0,0.5); text-align: center;
         }
-        /* ⭐️ 啟動按鈕樣式 */
+        /* ⭐️ 修正 2：新增啟動按鈕樣式，解決 MEDIA 錯誤 */
         #start_btn {
-            padding: 12px 30px; font-size: 20px; cursor: pointer;
+            display: none; padding: 12px 30px; font-size: 20px; cursor: pointer;
             background: #4169E1; color: white; border: none;
             border-radius: 5px; margin-bottom: 20px; font-weight: bold;
             box-shadow: 0 0 15px rgba(65, 105, 225, 0.5);
@@ -79,7 +79,7 @@
         <h1 style="color:#dcc75c; margin-bottom:5px;">烏鷺爭霸</h1>
         <p style="color:#aaa; font-size:14px; margin-bottom:30px;">CrowHeronGo Strategic Board Game</p>
         
-        <button id="start_btn" style="display:none;">進入棋局</button>
+        <button id="start_btn">進入棋局</button>
 
         <div class="emscripten" id="status">正在同步棋局檔案...</div>
         <div class="emscripten">
