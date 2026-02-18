@@ -1,39 +1,39 @@
 <html lang="zh-Hant">
-<script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" type=module id="site" data-python="python3.12" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#</script>
-
 <head>
-<script type="application/javascript">
-config = {
-    xtermjs : "1" ,
-    _sdl2 : "canvas",
-    user_canvas : 0,
-    user_canvas_managed : 0,
-    gui_divider : 2,
-    ume_block : 1,
-    can_close : 0,
-    archive : "game", // ⭐️ 已同步修正
-    gui_debug : 0,
-    cdn : "https://pygame-web.github.io/cdn/0.9.3/",
-    autorun : 1, 
-    PYBUILD : "3.12",
-    fb_ar   : 1.77,
-    fb_width : "1280",
-    fb_height : "720"
-}
-
-function show_infobox() {
-    infobox.style.display = "block";
-    const w = infobox.offsetWidth;
-    const h = infobox.offsetHeight;
-    infobox.style.left = (window.innerWidth - w) / 2 + "px";
-    infobox.style.top = (window.innerHeight - h) / 2 + "px";
-}
-</script>
-
-    <title>烏鷺爭霸 - 網頁版</title>
     <meta charset="UTF-8">
+    <title>烏鷺爭霸 - 網頁版</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
+
+    <script src="https://pygame-web.github.io/cdn/0.9.3/browserfs.min.js"></script>
+
+    <script type="application/javascript">
+    config = {
+        xtermjs : "1" ,
+        _sdl2 : "canvas",
+        user_canvas : 0,
+        user_canvas_managed : 0,
+        gui_divider : 2,
+        ume_block : 1,
+        can_close : 0,
+        archive : "game", 
+        gui_debug : 0,
+        cdn : "https://pygame-web.github.io/cdn/0.9.3/",
+        autorun : 1, 
+        PYBUILD : "3.12",
+        fb_ar   : 1.77,
+        fb_width : "1280",
+        fb_height : "720"
+    }
+
+    function show_infobox() {
+        infobox.style.display = "block";
+        const w = infobox.offsetWidth;
+        const h = infobox.offsetHeight;
+        infobox.style.left = (window.innerWidth - w) / 2 + "px";
+        infobox.style.top = (window.innerHeight - h) / 2 + "px";
+    }
+    </script>
 
     <style>
         body {
@@ -52,6 +52,13 @@ function show_infobox() {
             font-size: 20px; padding: 20px 40px; z-index: 9999;
             box-shadow: 0 0 20px rgba(0,0,0,0.5); text-align: center;
         }
+        /* ⭐️ 啟動按鈕樣式 */
+        #start_btn {
+            padding: 12px 30px; font-size: 20px; cursor: pointer;
+            background: #4169E1; color: white; border: none;
+            border-radius: 5px; margin-bottom: 20px; font-weight: bold;
+            box-shadow: 0 0 15px rgba(65, 105, 225, 0.5);
+        }
         canvas.emscripten {
             border: 0px none; background-color: transparent;
             width: 100%; height: 100%; z-index: 5;
@@ -63,20 +70,27 @@ function show_infobox() {
             text-align: center; z-index: 10;
         }
     </style>
-    <script src="https://pygame-web.github.io/cdn/0.9.3//browserfs.min.js"></script>
 </head>
 
 <body>
+    <script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" type=module id="site" data-python="python3.12" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#</script>
+
     <div id="transfer">
         <h1 style="color:#dcc75c; margin-bottom:5px;">烏鷺爭霸</h1>
         <p style="color:#aaa; font-size:14px; margin-bottom:30px;">CrowHeronGo Strategic Board Game</p>
+        
+        <button id="start_btn" style="display:none;">進入棋局</button>
+
         <div class="emscripten" id="status">正在同步棋局檔案...</div>
         <div class="emscripten">
             <progress value="0" max="100" id="progress"></progress>
         </div>
     </div>
+
     <canvas class="emscripten" id="canvas" width="1px" height="1px" oncontextmenu="event.preventDefault()" tabindex=1></canvas>
+    
     <div id="infobox">載入中，請稍候...</div>
+
     <script type="application/javascript">
     async function custom_onload(debug_hidden) {
         if (typeof pyconsole !== 'undefined') pyconsole.hidden = true;
