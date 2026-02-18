@@ -31,6 +31,24 @@
     </script>
 
     <style>
+        <div id="debug-box" style="position:fixed; top:0; left:0; background:rgba(0,0,0,0.9); color:lime; z-index:10000; padding:10px; font-family:monospace; font-size:12px;">
+    檢測中...
+</div>
+<script>
+    async function testFiles() {
+        const dbg = document.getElementById('debug-box');
+        try {
+            const r = await fetch('main.py?v=' + Date.now()); // 強制抓取最新版
+            const text = await r.text();
+            dbg.innerHTML = `檔案讀取: ${r.ok ? '✅' : '❌'}<br>` +
+                            `內容長度: ${text.length} bytes<br>` +
+                            `首行內容: ${text.substring(0, 30)}...<br>` +
+                            `換行檢測: ${text.includes('\n') ? '✅ 有換行' : '❌ 無換行'}`;
+            if(text.length === 0) dbg.style.color = 'red';
+        } catch(e) { dbg.innerHTML = "連線失敗: " + e; }
+    }
+    testFiles();
+</script>
         body {
             font-family: "Microsoft JhengHei", sans-serif;
             margin: 0; padding: 0;
@@ -97,4 +115,5 @@
     </script>
 </body>
 </html>
+
 
