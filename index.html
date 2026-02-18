@@ -1,14 +1,14 @@
-
-`<script ...>#</script>`
-
+<!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
     <title>烏鷺爭霸 - 網頁版</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <link rel="icon" type="image/png" href="favicon.png" sizes="16x16">
+    
+    <link rel="icon" type="image/png" href="favicon.png">
+    <link rel="shortcut icon" href="favicon.png">
 
-    <script src="https://pygame-web.github.io/cdn/0.9.3/browserfs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/browserfs@1.4.3/dist/browserfs.min.js"></script>
 
     <script type="application/javascript">
     config = {
@@ -19,6 +19,8 @@
         gui_divider : 2,
         ume_block : 1,
         can_close : 0,
+        // 如果你改名了 main.py 但沒重新打包 game.tar.gz，
+        // 可以暫時把下面這行改成 archive : "" 來直接讀取鬆散檔案測試
         archive : "game", 
         gui_debug : 0,
         cdn : "https://pygame-web.github.io/cdn/0.9.3/",
@@ -42,13 +44,12 @@
         #progress::-webkit-progress-bar { background-color: #444; border-radius: 6px; }
         #progress::-webkit-progress-value { background-color: #4169E1; border-radius: 6px; }
         
-        /* 讓載入框變成顯眼的按鈕 */
         #infobox {
             position: fixed; background: rgba(65, 105, 225, 0.9);
             color: #fff; border: 2px solid #dcc75c; border-radius: 10px;
             font-size: 20px; padding: 20px 40px; z-index: 9999;
             box-shadow: 0 0 20px rgba(0,0,0,0.5); text-align: center;
-            cursor: pointer;
+            cursor: pointer; display: none; /* 初始隱藏，由腳本顯示 */
         }
         canvas.emscripten {
             border: 0px none; background-color: transparent;
@@ -64,7 +65,7 @@
 </head>
 
 <body>
-    <script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" type=module id="site" data-python="python3.12" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#</script>
+    <script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" type="module" id="site" data-python="python3.12" data-os="vtx,snd,gui" async defer></script>
 
     <div id="transfer">
         <h1 style="color:#dcc75c; margin-bottom:5px;">烏鷺爭霸</h1>
@@ -75,14 +76,22 @@
         </div>
     </div>
 
-    <canvas class="emscripten" id="canvas" width="1px" height="1px" oncontextmenu="event.preventDefault()" tabindex=1></canvas>
-    <div id="infobox" onclick="this.innerText='啟動中...'">正在同步棋局檔案...</div>
+    <canvas class="emscripten" id="canvas" oncontextmenu="event.preventDefault()" tabindex="1"></canvas>
+    
+    <div id="infobox" onclick="this.innerText='啟動中...'; window.dispatchEvent(new Event('resize'));">點擊此處啟動遊戲</div>
 
     <script type="application/javascript">
+    // 當資源載入完成後執行的函式
     async function custom_onload(debug_hidden) {
         if (typeof pyconsole !== 'undefined') pyconsole.hidden = true;
         if (typeof system !== 'undefined') system.hidden = true;
+        
+        const transfer = document.getElementById('transfer');
+        const infobox = document.getElementById('infobox');
+        
         transfer.hidden = false;
+        
+        // 居中顯示啟動按鈕
         const w = infobox.offsetWidth;
         const h = infobox.offsetHeight;
         infobox.style.left = (window.innerWidth - w) / 2 + "px";
@@ -92,5 +101,3 @@
     </script>
 </body>
 </html>
-
-
