@@ -25,14 +25,6 @@
         fb_width : "1280",
         fb_height : "720"
     }
-
-    function show_infobox() {
-        infobox.style.display = "block";
-        const w = infobox.offsetWidth;
-        const h = infobox.offsetHeight;
-        infobox.style.left = (window.innerWidth - w) / 2 + "px";
-        infobox.style.top = (window.innerHeight - h) / 2 + "px";
-    }
     </script>
 
     <style>
@@ -45,20 +37,15 @@
         #status { display: block; margin-top: 20px; font-weight: bold; color: #dcc75c; }
         #progress { height: 12px; width: 80%; max-width: 400px; border-radius: 6px; appearance: none; }
         #progress::-webkit-progress-bar { background-color: #444; border-radius: 6px; }
-        #progress::-webkit-progress-value { background-color: #4169E1; border-radius: 6px; box-shadow: 0 0 10px #4169E1; }
+        #progress::-webkit-progress-value { background-color: #4169E1; border-radius: 6px; }
         
-        /* ⭐️ 啟動按鈕：解決 MEDIA USER ACTION 錯誤 */
-        #start_btn {
-            display: none; padding: 12px 30px; font-size: 20px; cursor: pointer;
-            background: #4169E1; color: white; border: none; border-radius: 8px;
-            margin-bottom: 20px; font-weight: bold; box-shadow: 0 0 15px rgba(65, 105, 225, 0.5);
-        }
-
+        /* 讓載入框變成顯眼的按鈕 */
         #infobox {
-            position: fixed; background: rgba(40, 44, 52, 0.9);
+            position: fixed; background: rgba(65, 105, 225, 0.9);
             color: #fff; border: 2px solid #dcc75c; border-radius: 10px;
-            font-size: 18px; padding: 20px 40px; z-index: 9999;
+            font-size: 20px; padding: 20px 40px; z-index: 9999;
             box-shadow: 0 0 20px rgba(0,0,0,0.5); text-align: center;
+            cursor: pointer;
         }
         canvas.emscripten {
             border: 0px none; background-color: transparent;
@@ -79,25 +66,25 @@
     <div id="transfer">
         <h1 style="color:#dcc75c; margin-bottom:5px;">烏鷺爭霸</h1>
         <p style="color:#aaa; font-size:14px; margin-bottom:30px;">CrowHeronGo Strategic Board Game</p>
-        
-        <button id="start_btn">進入棋局</button>
-
-        <div class="emscripten" id="status">正在同步棋局檔案...</div>
+        <div class="emscripten" id="status">正在準備資源...</div>
         <div class="emscripten">
             <progress value="0" max="100" id="progress"></progress>
         </div>
     </div>
 
     <canvas class="emscripten" id="canvas" width="1px" height="1px" oncontextmenu="event.preventDefault()" tabindex=1></canvas>
-    
-    <div id="infobox">載入中，請稍候...</div>
+    <div id="infobox" onclick="this.innerText='啟動中...'">正在同步棋局檔案...</div>
 
     <script type="application/javascript">
     async function custom_onload(debug_hidden) {
         if (typeof pyconsole !== 'undefined') pyconsole.hidden = true;
         if (typeof system !== 'undefined') system.hidden = true;
         transfer.hidden = false;
-        show_infobox();
+        const w = infobox.offsetWidth;
+        const h = infobox.offsetHeight;
+        infobox.style.left = (window.innerWidth - w) / 2 + "px";
+        infobox.style.top = (window.innerHeight - h) / 2 + "px";
+        infobox.style.display = "block";
     }
     </script>
 </body>
