@@ -2,18 +2,16 @@
 <html lang="zh-Hant">
 <head>
     <meta charset="UTF-8">
-    <title>烏鷺爭霸 - CrowHeronGo 診斷版</title>
+    <title>烏鷺爭霸 - 終極修復測試版</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    
+
     <script src="https://cdn.jsdelivr.net/npm/browserfs@1.4.3/dist/browserfs.min.js"></script>
 
     <script type="application/javascript">
-    // 遊戲配置：fb_width/height 必須符合你的 560x780 設計
+    // 遊戲畫布配置
     config = {
         _sdl2 : "canvas",
         archive : "", 
-        gui_debug : 0,
-        cdn : "https://pygame-web.github.io/cdn/0.9.3/",
         autorun : 1, 
         PYBUILD : "3.12",
         fb_width : "560",
@@ -24,17 +22,25 @@
     <style>
         body { background: #1a1a1b; color: white; font-family: sans-serif; margin: 0; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; }
         
-        /* 測試日誌樣式 */
-        #diagnostic-log {
-            width: 90%; max-width: 500px; background: rgba(0,0,0,0.8);
-            border: 1px solid #555; padding: 10px; font-family: monospace;
-            font-size: 12px; color: #00ff00; margin-bottom: 10px;
+        /* 診斷面板樣式 */
+        #diagnostic-panel {
+            width: 90%; max-width: 500px; background: rgba(0,0,0,0.85);
+            border: 1px solid #00ff00; padding: 15px; font-family: monospace;
+            font-size: 13px; color: #00ff00; margin-bottom: 20px;
+            box-shadow: 0 0 15px rgba(0,255,0,0.2);
         }
 
         #infobox {
             background: #4169e1; color: white; padding: 20px 40px;
             border-radius: 10px; cursor: pointer; display: none;
             font-size: 20px; border: 2px solid #dcc75c;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(220, 199, 92, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(220, 199, 92, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(220, 199, 92, 0); }
         }
 
         canvas { border: 1px solid #333; max-width: 560px; width: 100%; height: auto; }
@@ -42,68 +48,67 @@
 </head>
 
 <body>
-    <div id="diagnostic-log">
-        <b>[系統預檢中...]</b><br>
-        <span id="check-main">等待讀取 main.py...</span><br>
-        <span id="check-browserfs">等待載入 BrowserFS...</span>
+    <div id="diagnostic-panel">
+        <b>【系統預檢日誌】</b><br><br>
+        <span id="check-app">⏳ 正在抓取 app.py...</span><br>
+        <span id="check-bfs">⏳ 正在初始化 BrowserFS...</span><br>
+        <hr style="border:0; border-top:1px solid #333; margin:10px 0;">
+        <span id="check-status" style="color: #ffff00;">等待核心載入中...</span>
     </div>
 
     <canvas id="canvas" tabindex="1"></canvas>
     
-    <div id="infobox" onclick="start_game()">點擊此處解鎖並開始遊戲</div>
+    <div id="infobox" onclick="start_game()">點擊此處解鎖並啟動遊戲</div>
 
     <script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" 
             type="module" id="site" 
             data-python="python3.12" 
-            data-main="main.py?v=20260218" 
+            data-main="app.py?v=final_fix_2026" 
             async defer></script>
 
     <script type="application/javascript">
-        // 1. 自動診斷腳本
         async function runDiagnostic() {
-            const logMain = document.getElementById('check-main');
-            const logBFS = document.getElementById('check-browserfs');
+            const logApp = document.getElementById('check-app');
+            const logBFS = document.getElementById('check-bfs');
+            const logStatus = document.getElementById('check-status');
 
-            // 檢查 main.py 讀取狀況
+            // 測試讀取 app.py 內容
             try {
-                const response = await fetch('main.py?v=' + Date.now());
+                const response = await fetch('app.py?v=' + Date.now());
                 const text = await response.text();
                 if (response.ok && text.length > 0) {
-                    logMain.innerHTML = `✅ main.py: 已連線 (長度: ${text.length} bytes)`;
+                    logApp.innerHTML = `✅ app.py: 讀取成功 (${text.length} bytes)`;
                     if (!text.includes('\n')) {
-                        logMain.innerHTML += `<br>⚠️ <span style="color:red">錯誤：程式碼擠成一整行，請手動換行！</span>`;
+                        logApp.innerHTML += `<br>❌ <span style="color:red">警告：代碼擠成一整行，請修正縮排！</span>`;
                     }
                 } else {
-                    logMain.innerHTML = `❌ <span style="color:red">main.py: 讀取失敗或檔案為空 (len=0)</span>`;
+                    logApp.innerHTML = `❌ <span style="color:red">app.py: 讀取到 0 位元組 (快取死鎖中)</span>`;
                 }
             } catch (e) {
-                logMain.innerHTML = `❌ main.py: 連線錯誤`;
+                logApp.innerHTML = `❌ app.py: 檔案不存在 (404)`;
             }
 
-            // 檢查 BrowserFS 函式庫
+            // 測試 BrowserFS
             if (typeof BrowserFS !== 'undefined') {
-                logBFS.innerHTML = `✅ BrowserFS: 函式庫載入成功`;
+                logBFS.innerHTML = `✅ BrowserFS: 函式庫就緒`;
             } else {
-                logBFS.innerHTML = `❌ <span style="color:red">BrowserFS: 載入失敗，請檢查網路</span>`;
+                logBFS.innerHTML = `❌ <span style="color:red">BrowserFS: 載入失敗</span>`;
             }
         }
 
-        // 2. 啟動按鈕邏輯
         function start_game() {
             document.getElementById('infobox').style.display = 'none';
-            document.getElementById('diagnostic-log').style.display = 'none';
-            // 觸發視窗縮放以取得畫布焦點
+            document.getElementById('diagnostic-panel').style.display = 'none';
+            // 強制重繪視窗以確保 Canvas 取得焦點
             window.dispatchEvent(new Event('resize'));
         }
 
-        // 3. Pygame-web 生命週期勾子
+        // Pygame-web 核心啟動後的回呼
         async function custom_onload(debug_hidden) {
-            // 隱藏預設進度條並顯示啟動按鈕
-            const infobox = document.getElementById('infobox');
-            infobox.style.display = "block";
+            document.getElementById('infobox').style.display = "block";
+            document.getElementById('check-status').innerHTML = "✅ Python 虛擬機已預備完成！";
         }
 
-        // 執行診斷
         runDiagnostic();
     </script>
 </body>
