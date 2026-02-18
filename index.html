@@ -1,3 +1,6 @@
+
+
+
 <!DOCTYPE html>
 <html lang="zh-Hant">
 <head>
@@ -109,6 +112,47 @@ window.addEventListener('load', checkResources);
 <body>
     <script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" type="module" id="site" data-python="python3.12" data-os="vtx,snd,gui" async defer></script>
 
+
+    <div id="file-check-log" style="background: rgba(0,0,0,0.8); color: #00ff00; padding: 10px; font-family: monospace; font-size: 12px; border: 1px solid #555; margin: 10px;">
+    [系統預檢中...]
+</div>
+
+<script>
+async function verifyFiles() {
+    const log = document.getElementById('file-check-log');
+    const files = [
+        'main.py',      // 這是啟動核心
+        'engine.py',    // 你目前在 GitHub 上的檔名
+        'index.html', 
+        'game.tar.gz',
+        'favicon.png'
+    ];
+    
+    log.innerHTML = "<b>--- 檔案存取檢查 ---</b><br>";
+    
+    for (const file of files) {
+        try {
+            const response = await fetch(file, { method: 'HEAD' });
+            if (response.ok) {
+                log.innerHTML += `✅ <span style="color:#00ff00">${file}</span>: 成功連結<br>`;
+            } else {
+                log.innerHTML += `❌ <span style="color:red">${file}</span>: 找不到 (404)<br>`;
+            }
+        } catch (e) {
+            log.innerHTML += `⚠️ ${file}: 請求失敗<br>`;
+        }
+    }
+    
+    // 檢查 BrowserFS 是否就緒
+    if (typeof BrowserFS !== 'undefined') {
+        log.innerHTML += `✅ <span style="color:#00ff00">BrowserFS</span>: 函式庫已載入<br>`;
+    } else {
+        log.innerHTML += `❌ <span style="color:red">BrowserFS</span>: 遺失，請檢查 CDN 連結<br>`;
+    }
+}
+// 立即執行檢查
+verifyFiles();
+</script>
     <div id="transfer">
         <h1 style="color:#dcc75c; margin-bottom:5px;">烏鷺爭霸</h1>
         <p style="color:#aaa; font-size:14px; margin-bottom:30px;">CrowHeronGo Strategic Board Game</p>
@@ -143,4 +187,5 @@ window.addEventListener('load', checkResources);
     </script>
 </body>
 </html>
+
 
