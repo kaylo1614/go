@@ -1,6 +1,8 @@
-<html lang="zh-Hant"><script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" type=module id="site" data-python="python3.12" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#</script><head>
+<html lang="zh-Hant">
+<script src="https://pygame-web.github.io/cdn/0.9.3/pythons.js" type=module id="site" data-python="python3.12" data-LINES=42 data-COLUMNS=132 data-os="vtx,snd,gui" async defer>#</script>
+
+<head>
 <script type="application/javascript">
-    
 config = {
     xtermjs : "1" ,
     _sdl2 : "canvas",
@@ -9,10 +11,10 @@ config = {
     gui_divider : 2,
     ume_block : 1,
     can_close : 0,
-    archive : "訓練1", // ⭐️ 請確認這裡與您的 APK 檔名完全一致
-    gui_debug : 0,    // 關閉除錯模式以加速
+    archive : "訓練1", 
+    gui_debug : 0,
     cdn : "https://pygame-web.github.io/cdn/0.9.3/",
-    autorun : 1,      // ⭐️ 修正：改為 1 讓它自動執行
+    autorun : 1, 
     PYBUILD : "3.12",
     fb_ar   : 1.77,
     fb_width : "1280",
@@ -36,74 +38,41 @@ function show_infobox() {
     <style>
         body {
             font-family: "Microsoft JhengHei", "微軟正黑體", sans-serif;
-            margin: 0;
-            padding: 0;
-            /* 修正：深色漸層背景 */
+            margin: 0; padding: 0;
             background: linear-gradient(135deg, #1a1a1b 0%, #2d2d30 100%);
             color: white;
             overflow: hidden;
         }
-
         #status {
-            display: block;
-            margin-top: 20px;
-            font-weight: bold;
-            color: #dcc75c; /* 金色文字 */
+            display: block; margin-top: 20px;
+            font-weight: bold; color: #dcc75c;
             text-shadow: 1px 1px 2px black;
         }
-
-        /* 修正：優化進度條樣式 */
         #progress {
-            height: 12px;
-            width: 80%;
-            max-width: 400px;
-            border-radius: 6px;
-            appearance: none;
+            height: 12px; width: 80%; max-width: 400px;
+            border-radius: 6px; appearance: none;
         }
-        #progress::-webkit-progress-bar {
-            background-color: #444;
-            border-radius: 6px;
-        }
+        #progress::-webkit-progress-bar { background-color: #444; border-radius: 6px; }
         #progress::-webkit-progress-value {
-            background-color: #4169E1; /* 能量藍 */
-            border-radius: 6px;
+            background-color: #4169E1; border-radius: 6px;
             box-shadow: 0 0 10px #4169E1;
         }
-
-        /* 修正：提示框樣式美化 */
         #infobox {
             position: fixed;
             background: rgba(40, 44, 52, 0.9);
-            color: #fff;
-            border: 2px solid #dcc75c;
-            border-radius: 10px;
-            font-size: 20px;
-            padding: 20px 40px;
-            z-index: 9999;
-            box-shadow: 0 0 20px rgba(0,0,0,0.5);
-            text-align: center;
+            color: #fff; border: 2px solid #dcc75c; border-radius: 10px;
+            font-size: 20px; padding: 20px 40px; z-index: 9999;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5); text-align: center;
         }
-
         canvas.emscripten {
-            border: 0px none;
-            background-color: transparent;
-            width: 100%;
-            height: 100%;
-            z-index: 5;
-            padding: 0;
-            margin: 0 auto;
-            position: absolute;
-            top: 0; bottom: 0; left: 0; right: 0;
+            border: 0px none; background-color: transparent;
+            width: 100%; height: 100%; z-index: 5;
+            position: absolute; top: 0; bottom: 0; left: 0; right: 0;
         }
-
         #transfer {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 100%;
-            text-align: center;
-            z-index: 10;
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%); width: 100%;
+            text-align: center; z-index: 10;
         }
     </style>
     <script src="https://pygame-web.github.io/cdn/0.9.3//browserfs.min.js"></script>
@@ -125,7 +94,6 @@ function show_infobox() {
 
     <script type="application/javascript">
     async function custom_onload(debug_hidden) {
-        // 預設隱藏偵錯視窗
         if (typeof pyconsole !== 'undefined') pyconsole.hidden = true;
         if (typeof system !== 'undefined') system.hidden = true;
         transfer.hidden = false;
